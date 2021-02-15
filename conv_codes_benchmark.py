@@ -91,7 +91,7 @@ if __name__ == '__main__':
 
     trellis1 = cc.Trellis(M, generator_matrix,feedback=feedback)  # Create trellis data structure
     trellis_length = 3
-    state_order = [0,2,1,3]
+    state_order = [0,2,1,3]  # 00,10,01,11
     bit_colors = ['red', 'green'] 
 
     trellis1.visualize(trellis_length, state_order, 

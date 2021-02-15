@@ -3,47 +3,49 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 import sys
-from keras.callbacks import LearningRateScheduler
-from keras.layers.convolutional import Conv1D
-from keras.layers import Input, Dense, Reshape, Flatten, Dropout
-from keras.layers import BatchNormalization, Activation, ZeroPadding2D
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.convolutional import UpSampling2D, Conv2D
-from keras.models import Sequential, Model
-from keras.optimizers import RMSprop, Adam
-import keras
-from keras.layers import Input, Embedding, LSTM,GRU, Dense, TimeDistributed, Lambda
-from keras.models import Model
-from keras.layers.wrappers import  Bidirectional
+from tensorflow.keras.callbacks import LearningRateScheduler
+#from tensorflow.keras.layers.convolutional import Conv1D
+from tensorflow.keras.layers import Input, Dense, Reshape, Flatten, Dropout
+from tensorflow.keras.layers import BatchNormalization, Activation, ZeroPadding2D
+#from tensorflow.keras.layers.advanced_activations import LeakyReLU
+#from tensorflow.keras.layers.convolutional import UpSampling2D, Conv2D
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.optimizers import RMSprop, Adam
+from tensorflow.keras.layers import Input, Embedding, LSTM,GRU, Dense, TimeDistributed, Lambda
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import  Bidirectional
 
-from keras.legacy import interfaces
-from keras.optimizers import Optimizer
+#from tensorflow.keras.legacy import interfaces
+from tensorflow.keras.optimizers import Optimizer
 import commpy.channelcoding.convcode as cc
 
-import keras.backend as K
+import tensorflow.keras.backend as K
 import tensorflow as tf
 
-from keras.layers import Input, Dense, Reshape, Flatten, Embedding, Dropout
-from keras.layers import BatchNormalization
-from keras.models import Sequential, Model
-from keras.optimizers import Adam
-from keras.utils.generic_utils import Progbar
+from tensorflow.keras.layers import Input, Dense, Reshape, Flatten, Embedding, Dropout
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.models import Sequential, Model
+from tensorflow.keras.optimizers import Adam
+#from tensorflow.keras.utils.generic_utils import Progbar
 import numpy as np
 
-from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-frac = 0.45
+#from tensorflow.keras.backend.tensorflow_backend import set_session
+#config = tf.ConfigProto()
+#frac = 0.45
 
-config.gpu_options.per_process_gpu_memory_fraction = frac
-set_session(tf.Session(config=config))
-print '[Test][Warining] Restrict GPU memory usage to', frac, ', enable',str(int(1.0/frac)), 'processes'
+#config.gpu_options.per_process_gpu_memory_fraction = frac
+#set_session(tf.Session(config=config))
+#print('[Test][Warining] Restrict GPU memory usage to', frac, ', enable',str(int(1.0/frac)), 'processes')
 import matplotlib.pyplot as plt
 
 import numpy as np
 
 def conv_enc(X_train_raw, args):
+    # encode the message bits with a convolutional encoder
     num_block = X_train_raw.shape[0]
     block_len = X_train_raw.shape[1]
     x_code    = []
@@ -106,39 +108,39 @@ def get_args():
 
 
     args = parser.parse_args()
-    print args
+    print(args)
 
-    print '[ID]', args.id
+    print('[ID]', args.id)
     return args
+
+def channel(x):
+    print('training with noise snr db', args.train_channel_low, args.train_channel_high)
+    noise_sigma_low =  snr_db2sigma(args.train_channel_low) # 0dB
+    noise_sigma_high =  snr_db2sigma(args.train_channel_high) # 0dB
+    print('training with noise snr db', noise_sigma_low, noise_sigma_high)
+    noise_sigma =  tf.random.uniform(tf.shape(x),
+        minval=noise_sigma_high,
+        maxval=noise_sigma_low,
+        dtype=tf.float32
+    )
+
+    return x+ noise_sigma*tf.random.normal(tf.shape(x),dtype=tf.float32, mean=0., stddev=1.0)   #need to include space for different snrs
 
 def build_decoder(args):
 
     ont_pretrain_trainable = True
-    dropout_rate           = 1.0
-
-    def channel(x):
-        print 'training with noise snr db', args.train_channel_low, args.train_channel_high
-        noise_sigma_low =  snr_db2sigma(args.train_channel_low) # 0dB
-        noise_sigma_high =  snr_db2sigma(args.train_channel_high) # 0dB
-        print 'training with noise snr db', noise_sigma_low, noise_sigma_high
-        noise_sigma =  tf.random_uniform(tf.shape(x),
-            minval=noise_sigma_high,
-            maxval=noise_sigma_low,
-            dtype=tf.float32
-        )
-
-        return x+ noise_sigma*tf.random_normal(tf.shape(x),dtype=tf.float32, mean=0., stddev=1.0)   #need to include space for different snrs
+    dropout_rate           = 0.49
 
     input_x         = Input(shape = (args.block_len, args.code_rate), dtype='float32', name='D_input')
     combined_x      = Lambda(channel)(input_x)
 
     for layer in range(args.num_Dec_layer):
         if args.rnn_setup == 'gru':
-            combined_x = Bidirectional(GRU(units=args.num_Dec_unit, activation='tanh', dropout=dropout_rate,
+            combined_x = Bidirectional(GRU(units=args.num_Dec_unit, activation='sigmoid', dropout=dropout_rate,
                                            return_sequences=True, trainable=ont_pretrain_trainable),
                                        name = 'Dec_'+args.rnn_setup+'_'+str(layer))(combined_x)
         else:
-            combined_x = Bidirectional(LSTM(units=args.num_Dec_unit, activation='tanh', dropout=dropout_rate,
+            combined_x = Bidirectional(LSTM(units=args.num_Dec_unit, activation='sigmoid', dropout=dropout_rate,
                                             return_sequences=True, trainable=ont_pretrain_trainable),
                                        name = 'Dec_'+args.rnn_setup+'_'+str(layer))(combined_x)
 
@@ -150,11 +152,11 @@ def build_decoder(args):
 
 def train(args):
 
-    X_train_raw = np.random.randint(0,2,args.block_len * args.num_block)
-    X_test_raw  = np.random.randint(0,2,args.block_len * args.num_block/args.test_ratio)
+    X_train_raw = np.random.randint(0,2,int(args.block_len * args.num_block))
+    X_test_raw  = np.random.randint(0,2,int(args.block_len * args.num_block/args.test_ratio))
 
     X_train = X_train_raw.reshape((args.num_block, args.block_len, 1))
-    X_test  = X_test_raw.reshape((args.num_block/args.test_ratio, args.block_len, 1))
+    X_test  = X_test_raw.reshape((int(args.num_block/args.test_ratio), args.block_len, 1))
 
     X_conv_train = 2.0*conv_enc(X_train, args) - 1.0
     X_conv_test  = 2.0*conv_enc(X_test, args)  - 1.0
@@ -164,16 +166,16 @@ def train(args):
     def scheduler(epoch):
 
         if epoch > 10 and epoch <=15:
-            print 'changing by /10 lr'
+            print('changing by /10 lr')
             lr = args.learning_rate/10.0
         elif epoch >15 and epoch <=20:
-            print 'changing by /100 lr'
+            print('changing by /100 lr')
             lr = args.learning_rate/100.0
         elif epoch >20 and epoch <=25:
-            print 'changing by /1000 lr'
+            print('changing by /1000 lr')
             lr = args.learning_rate/1000.0
         elif epoch > 25:
-            print 'changing by /10000 lr'
+            print('changing by /10000 lr')
             lr = args.learning_rate/10000.0
         else:
             lr = args.learning_rate
@@ -183,9 +185,9 @@ def train(args):
 
 
     if args.Dec_weight == 'default':
-        print 'Decoder has no weight'
+        print('Decoder has no weight')
     else:
-        print 'Decoder loaded weight', args.Dec_weight
+        print('Decoder loaded weight', args.Dec_weight)
         model.load_weights(args.Dec_weight)
 
 
@@ -200,6 +202,10 @@ def train(args):
               batch_size=args.batch_size, epochs=args.num_epoch)
 
     model.save_weights('./tmp/conv_dec'+args.id+'.h5')
+
+def channel_test(x, snr_db):
+    noise_sigma =  snr_db2sigma(snr_db)
+    return x+ noise_sigma*tf.random_normal(tf.shape(x),dtype=tf.float32, mean=0., stddev=1.0)   #need to include space for different snrs
 
 def test(args, dec_weight):
     X_test_raw  = np.random.randint(0,2,args.num_block*args.block_len/args.test_ratio)
@@ -223,18 +229,14 @@ def test(args, dec_weight):
     test_sigmas = np.array([np.sqrt(1/(2*10**(float(item)/float(10)))) for item in SNRS_dB_Es])
 
     SNRS = SNRS_dB
-    print '[testing]', SNRS_dB
+    print('[testing]', SNRS_dB)
 
     ber, bler = [],[]
     for idx, snr_db in enumerate(SNRS_dB):
 
         inputs = Input(shape=(args.block_len, args.code_rate))
 
-        def channel(x):
-            noise_sigma =  snr_db2sigma(snr_db)
-            return x+ noise_sigma*tf.random_normal(tf.shape(x),dtype=tf.float32, mean=0., stddev=1.0)   #need to include space for different snrs
-
-        x          = Lambda(channel)(inputs)
+        x          = Lambda(channel_test)(inputs, snr_db)
 
         for layer in range(args.num_Dec_layer - 1):
             if args.rnn_setup == 'lstm':
@@ -279,9 +281,9 @@ def test(args, dec_weight):
 
         del model_test
 
-    print 'SNRS:', SNRS_dB
-    print 'BER:',ber
-    print 'BLER:',bler
+    print('SNRS:', SNRS_dB)
+    print('BER:', ber)
+    print('BLER:', bler)
 
 
 
