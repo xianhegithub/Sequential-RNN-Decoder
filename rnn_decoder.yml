@@ -1,0 +1,13 @@
+# how to update an environment with a yml file
+# conda env update --file env_opt_comms.yml  --prune
+# need to figure out how to set up environment with the yml file
+#conda env create -f rnn_decoder.yml
+name: rnn_decoder
+channels:
+  - defaults
+dependencies:
+  - python = 3.6
+  - numpy = 1.19.1
+  - matplotlib = 3.2.2
+  - h5py = 2.10.0
+  - tensorflow = 2.0

@@ -10,7 +10,7 @@ import math
 import commpy.channelcoding.turbo as turbo
 
 from scipy import stats
-import keras.backend as K
+#import keras.backend as K
 import tensorflow as tf
 
 #######################################
@@ -115,10 +115,10 @@ def corrupt_signal(input_signal, noise_type, sigma = 1.0,
         #a = denoise_thd
         if denoise_thd == 10.0:
             a = denoise_thd_func() + 1
-            print a
+            print(a)
         else:
             a = denoise_thd
-            print a
+            print(a)
 
         if noise_type == 'hyeji_bursty+denoise' or noise_type == 'hyeji_bursty+denoise0':
             corrupted_signal  = stats.threshold(corrupted_signal, threshmin=-a, threshmax=a, newval=0.0)
@@ -172,7 +172,7 @@ def corrupt_signal(input_signal, noise_type, sigma = 1.0,
         corrupted_signal = 2.0*input_signal-1.0 + noise
 
     else:
-        print '[Warning][Noise Generator]noise_type noty specified!'
+        print('[Warning][Noise Generator]noise_type noty specified!')
         noise = sigma * np.random.standard_normal(data_shape)
         corrupted_signal = 2.0*input_signal-1.0 + noise
 
@@ -252,7 +252,7 @@ def build_rnn_data_feed(num_block, block_len, noiser, codec, is_all_zero = False
         TBD, noise model shall be open to other user, for them to train their own decoder.
         '''
 
-        print '[Debug] Customize noise model not supported yet'
+        print('[Debug] Customize noise model not supported yet')
     else:  # awgn
         pass
 
@@ -330,7 +330,7 @@ def get_test_sigmas(snr_start, snr_end, snr_points):
     test_sigmas = np.array([np.sqrt(1/(2*10**(float(item)/float(10)))) for item in SNRS_dB_Es])
 
     SNRS = SNRS_dB
-    print '[testing] SNR range in dB ', SNRS
+    print('[testing] SNR range in dB ', SNRS)
 
     return SNRS, test_sigmas
 

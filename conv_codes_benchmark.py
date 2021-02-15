@@ -44,9 +44,31 @@ def get_args():
 
     args = parser.parse_args()
 
-    print args
-    print '[ID]', args.id
+    print(args)
+    print('[ID]', args.id)
     return args
+
+def turbo_compute(turbo_input):
+    '''
+    Compute Turbo Decoding in 1 iterations for one SNR point.
+    '''
+    idx = turbo_input[0]
+    x = turbo_input[1]
+    np.random.seed()
+    message_bits = np.random.randint(0, 2, args.block_len)
+
+    coded_bits = cc.conv_encode(message_bits, trellis1)
+    received  = corrupt_signal(coded_bits, noise_type =args.noise_type, sigma = test_sigmas[idx],
+                                vv =args.v, radar_power = args.radar_power, radar_prob = args.radar_prob,
+                                denoise_thd = args.radar_denoise_thd)
+
+    # make fair comparison between (100, 204) convolutional code and (100,200) RNN decoder, set the additional bit to 0
+    received[-2*int(M):] = 0.0
+
+    decoded_bits = cc.viterbi_decode(received.astype(float), trellis1, tb_depth, decoding_type='unquantized')
+    decoded_bits = decoded_bits[:-int(M)]
+    num_bit_errors = hamming_dist(message_bits, decoded_bits)
+    return num_bit_errors
 
 
 if __name__ == '__main__':
@@ -61,38 +83,24 @@ if __name__ == '__main__':
     elif args.code_rate == 3:
         generator_matrix = np.array([[args.enc1, args.enc2, args.enc3]])
     else:
-        print 'Not supported!'
+        print('Not supported!')
         sys.exit()
     feedback = args.feedback
 
-    print '[testing] Convolutional Code Encoder: G: ', generator_matrix,'Feedback: ', feedback,  'M: ', M
+    print('[testing] Convolutional Code Encoder: G: ', generator_matrix,'Feedback: ', feedback,  'M: ', M)
 
     trellis1 = cc.Trellis(M, generator_matrix,feedback=feedback)  # Create trellis data structure
+    trellis_length = 3
+    state_order = [0,2,1,3]
+    bit_colors = ['red', 'green'] 
+
+    trellis1.visualize(trellis_length, state_order, 
+                  edge_colors = bit_colors)
 
     SNRS, test_sigmas = get_test_sigmas(args.snr_test_start, args.snr_test_end, args.snr_points)
 
     tic = time.time()
-    tb_depth = 15
-
-    def turbo_compute((idx, x)):
-        '''
-        Compute Turbo Decoding in 1 iterations for one SNR point.
-        '''
-        np.random.seed()
-        message_bits = np.random.randint(0, 2, args.block_len)
-
-        coded_bits = cc.conv_encode(message_bits, trellis1)
-        received  = corrupt_signal(coded_bits, noise_type =args.noise_type, sigma = test_sigmas[idx],
-                                   vv =args.v, radar_power = args.radar_power, radar_prob = args.radar_prob,
-                                   denoise_thd = args.radar_denoise_thd)
-
-        # make fair comparison between (100, 204) convolutional code and (100,200) RNN decoder, set the additional bit to 0
-        received[-2*int(M):] = 0.0
-
-        decoded_bits = cc.viterbi_decode(received.astype(float), trellis1, tb_depth, decoding_type='unquantized')
-        decoded_bits = decoded_bits[:-int(M)]
-        num_bit_errors = hamming_dist(message_bits, decoded_bits)
-        return num_bit_errors
+    tb_depth = 15  # trace back depth
 
     commpy_res_ber = []
     commpy_res_bler= []
@@ -105,26 +113,26 @@ if __name__ == '__main__':
         start_time = time.time()
 
         pool = mp.Pool(processes=args.num_cpu)
-        results = pool.map(turbo_compute, [(idx,x) for x in range(args.num_block)])
+        results = pool.map(turbo_compute, [[idx,x] for x in range(args.num_block)])
 
         for result in results:
             if result == 0:
                 nb_block_no_errors[idx] = nb_block_no_errors[idx]+1
 
         nb_errors[idx]+= sum(results)
-        print '[testing]SNR: ' , SNRS[idx]
-        print '[testing]BER: ', sum(results)/float(args.block_len*args.num_block)
-        print '[testing]BLER: ', 1.0 - nb_block_no_errors[idx]/args.num_block
+        print('[testing]SNR: ' , SNRS[idx])
+        print('[testing]BER: ', sum(results)/float(args.block_len*args.num_block))
+        print('[testing]BLER: ', 1.0 - nb_block_no_errors[idx]/args.num_block)
         commpy_res_ber.append(sum(results)/float(args.block_len*args.num_block))
         commpy_res_bler.append(1.0 - nb_block_no_errors[idx]/args.num_block)
         end_time = time.time()
-        print '[testing] This SNR runnig time is', str(end_time-start_time)
+        print('[testing] This SNR runnig time is', str(end_time-start_time))
 
 
-    print '[Result]SNR: ', SNRS
-    print '[Result]BER', commpy_res_ber
-    print '[Result]BLER', commpy_res_bler
+    print('[Result]SNR: ', SNRS)
+    print('[Result]BER', commpy_res_ber)
+    print('[Result]BLER', commpy_res_bler)
 
     toc = time.time()
 
-    print '[Result]Total Running time:', toc-tic
+    print('[Result]Total Running time:', toc-tic)
